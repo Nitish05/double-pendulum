@@ -5,18 +5,18 @@ import math
 
 # UI Classes
 class Button:
-    def __init__(self, x, y, w, h, text, callback):
+    def __init__(self, x, y, w, h, text, callback, color=(200, 200, 200)):
         self.rect = pygame.Rect(x, y, w, h)
         self.text = text
         self.callback = callback
-        self.color = (200, 200, 200)
-        self.hover_color = (170, 170, 170)
+        self.base_color = color
+        self.hover_color = (min(color[0]+30, 255), min(color[1]+30, 255), min(color[2]+30, 255))
         self.text_color = (0, 0, 0)
-        self.font = pygame.font.SysFont(None, 24)
+        self.font = pygame.font.SysFont(None, 20)
 
     def draw(self, screen):
         mouse_pos = pygame.mouse.get_pos()
-        color = self.hover_color if self.rect.collidepoint(mouse_pos) else self.color
+        color = self.hover_color if self.rect.collidepoint(mouse_pos) else self.base_color
         pygame.draw.rect(screen, color, self.rect)
         pygame.draw.rect(screen, (0, 0, 0), self.rect, 2)
         
@@ -67,7 +67,7 @@ class InputBox:
     def draw(self, screen):
         # Draw label
         label_surf = self.label_font.render(self.label, True, (0, 0, 0))
-        screen.blit(label_surf, (self.rect.x, self.rect.y - 20))
+        screen.blit(label_surf, (self.rect.x - label_surf.get_width() - 10, self.rect.y + 5))
         
         # Draw box
         pygame.draw.rect(screen, self.color, self.rect, 2)
@@ -75,7 +75,7 @@ class InputBox:
         # Draw text
         text_surf = self.font.render(self.text, True, (0, 0, 0))
         screen.blit(text_surf, (self.rect.x + 5, self.rect.y + 5))
-        self.rect.w = max(100, text_surf.get_width() + 10)
+        self.rect.w = max(60, text_surf.get_width() + 10)
 
 def animate_pendulum(pendulum):
     """
@@ -92,15 +92,34 @@ def animate_pendulum(pendulum):
     # Colors
     WHITE = (255, 255, 255)
     BLACK = (0, 0, 0)
-    RED = (255, 0, 0)
-    BLUE = (0, 0, 255)
     GREY = (100, 100, 100)
+    
+    # Trace Colors
+    COLORS = [
+        (255, 0, 0),   # Red
+        (0, 255, 0),   # Green
+        (0, 0, 255),   # Blue
+        (255, 255, 0), # Yellow
+        (255, 0, 255), # Magenta
+        (0, 255, 255), # Cyan
+        (0, 0, 0)      # Black
+    ]
+    COLOR_NAMES = ["Red", "Green", "Blue", "Yellow", "Magenta", "Cyan", "Black"]
 
     clock = pygame.time.Clock()
     
     # Trace history
     history_len = 500
-    trace_points = []
+    trace_points1 = []
+    trace_points2 = []
+    
+    # Trace settings
+    show_trace1 = True
+    show_trace2 = True
+    color_idx1 = 1 # Green default for Bob 1
+    color_idx2 = 0 # Red default for Bob 2
+    
+    ui_visible = True
 
     running = True
     dragging_bob = None # 1 or 2
@@ -110,28 +129,77 @@ def animate_pendulum(pendulum):
     # UI Callbacks
     def reset_simulation():
         pendulum.state = np.array([0.01, 0, 0.01, 0], dtype=float)
-        trace_points.clear()
+        trace_points1.clear()
+        trace_points2.clear()
 
     def update_L1(val):
         pendulum.L1 = val
-        # Need to update scaling if length changes significantly?
-        # Ideally we recalculate scale every frame or just let it be.
-        # For now let's keep scale dynamic in the loop.
+        trace_points1.clear()
+        trace_points2.clear()
 
     def update_L2(val):
         pendulum.L2 = val
+        trace_points2.clear()
 
     def update_damping(val):
         pendulum.damping = val
+        
+    def toggle_trace1():
+        nonlocal show_trace1
+        show_trace1 = not show_trace1
+        btn_trace1.text = "Trace 1: ON" if show_trace1 else "Trace 1: OFF"
 
-    # UI Elements
-    reset_btn = Button(20, HEIGHT - 60, 100, 40, "Reset", reset_simulation)
+    def toggle_trace2():
+        nonlocal show_trace2
+        show_trace2 = not show_trace2
+        btn_trace2.text = "Trace 2: ON" if show_trace2 else "Trace 2: OFF"
+        
+    def cycle_color1():
+        nonlocal color_idx1
+        color_idx1 = (color_idx1 + 1) % len(COLORS)
+        btn_color1.text = f"Color 1: {COLOR_NAMES[color_idx1]}"
+        btn_color1.base_color = COLORS[color_idx1]
+        # Make text readable against color
+        avg_color = sum(COLORS[color_idx1])/3
+        btn_color1.text_color = (0,0,0) if avg_color > 128 else (255,255,255)
+
+    def cycle_color2():
+        nonlocal color_idx2
+        color_idx2 = (color_idx2 + 1) % len(COLORS)
+        btn_color2.text = f"Color 2: {COLOR_NAMES[color_idx2]}"
+        btn_color2.base_color = COLORS[color_idx2]
+        avg_color = sum(COLORS[color_idx2])/3
+        btn_color2.text_color = (0,0,0) if avg_color > 128 else (255,255,255)
+        
+    def toggle_ui():
+        nonlocal ui_visible
+        ui_visible = not ui_visible
+        btn_hide_ui.text = "Hide UI" if ui_visible else "Show UI"
+
+    # UI Elements Layout (Top Right)
+    ui_x = WIDTH - 220
+    ui_y = 20
+    spacing = 40
     
-    input_l1 = InputBox(140, HEIGHT - 50, 80, 30, "L1 (m)", pendulum.L1, update_L1)
-    input_l2 = InputBox(240, HEIGHT - 50, 80, 30, "L2 (m)", pendulum.L2, update_L2)
-    input_damp = InputBox(340, HEIGHT - 50, 80, 30, "Damping", pendulum.damping, update_damping)
+    input_l1 = InputBox(ui_x + 80, ui_y, 60, 30, "L1 (m)", pendulum.L1, update_L1)
+    input_l2 = InputBox(ui_x + 80, ui_y + spacing, 60, 30, "L2 (m)", pendulum.L2, update_L2)
+    input_damp = InputBox(ui_x + 80, ui_y + spacing*2, 60, 30, "Damping", pendulum.damping, update_damping)
     
-    ui_elements = [reset_btn, input_l1, input_l2, input_damp]
+    reset_btn = Button(ui_x, ui_y + spacing*3, 140, 30, "Reset Simulation", reset_simulation)
+    
+    # Trace Controls
+    btn_trace1 = Button(ui_x, ui_y + spacing*4.5, 140, 25, "Trace 1: ON", toggle_trace1)
+    btn_color1 = Button(ui_x, ui_y + spacing*5.2, 140, 25, f"Color 1: {COLOR_NAMES[color_idx1]}", cycle_color1, COLORS[color_idx1])
+    
+    btn_trace2 = Button(ui_x, ui_y + spacing*6.5, 140, 25, "Trace 2: ON", toggle_trace2)
+    btn_color2 = Button(ui_x, ui_y + spacing*7.2, 140, 25, f"Color 2: {COLOR_NAMES[color_idx2]}", cycle_color2, COLORS[color_idx2])
+    
+    # Hide UI Button (Always visible, maybe bottom right or top right above others?)
+    # Let's put it at the very top right corner, above everything else
+    btn_hide_ui = Button(WIDTH - 100, HEIGHT - 40, 80, 30, "Hide UI", toggle_ui)
+    
+    main_ui_elements = [input_l1, input_l2, input_damp, reset_btn, 
+                   btn_trace1, btn_color1, btn_trace2, btn_color2]
 
     while running:
         # Dynamic scaling
@@ -147,18 +215,27 @@ def animate_pendulum(pendulum):
                 running = False
             
             # Handle UI events
-            for ui in ui_elements:
-                ui.handle_event(event)
+            if ui_visible:
+                for ui in main_ui_elements:
+                    ui.handle_event(event)
+            
+            # Always handle hide button
+            btn_hide_ui.handle_event(event)
             
             # Handle Dragging
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1: # Left click
                     # Check if clicked on UI?
                     clicked_ui = False
-                    for ui in ui_elements:
-                        if hasattr(ui, 'rect') and ui.rect.collidepoint(event.pos):
-                            clicked_ui = True
-                            break
+                    
+                    if btn_hide_ui.rect.collidepoint(event.pos):
+                        clicked_ui = True
+                    
+                    if ui_visible and not clicked_ui:
+                        for ui in main_ui_elements:
+                            if hasattr(ui, 'rect') and ui.rect.collidepoint(event.pos):
+                                clicked_ui = True
+                                break
                     
                     if not clicked_ui:
                         mx, my = pygame.mouse.get_pos()
@@ -256,7 +333,8 @@ def animate_pendulum(pendulum):
                 pendulum.state[3] = 0
                 
             # Clear trace when dragging
-            trace_points.clear()
+            trace_points1.clear()
+            trace_points2.clear()
 
         else:
             # Physics step
@@ -276,24 +354,35 @@ def animate_pendulum(pendulum):
 
         # Update trace
         if dragging_bob is None:
-            trace_points.append((curr_x2, curr_y2))
-            if len(trace_points) > history_len:
-                trace_points.pop(0)
+            trace_points1.append((curr_x1, curr_y1))
+            trace_points2.append((curr_x2, curr_y2))
+            if len(trace_points1) > history_len:
+                trace_points1.pop(0)
+            if len(trace_points2) > history_len:
+                trace_points2.pop(0)
 
-        # Draw trace
-        if len(trace_points) > 1:
-            pygame.draw.lines(screen, RED, False, trace_points, 1)
+        # Draw trace 1
+        if show_trace1 and len(trace_points1) > 1:
+            pygame.draw.lines(screen, COLORS[color_idx1], False, trace_points1, 1)
+            
+        # Draw trace 2
+        if show_trace2 and len(trace_points2) > 1:
+            pygame.draw.lines(screen, COLORS[color_idx2], False, trace_points2, 1)
 
         # Draw rods
         pygame.draw.line(screen, BLACK, (center_x, center_y), (curr_x1, curr_y1), 4)
         pygame.draw.line(screen, BLACK, (curr_x1, curr_y1), (curr_x2, curr_y2), 4)
 
         # Draw bobs
-        color1 = RED if dragging_bob == 1 else BLUE
-        color2 = RED if dragging_bob == 2 else BLUE
+        # Use trace colors for bobs too? Or stick to Blue?
+        # Let's use trace colors to match
+        c1 = COLORS[color_idx1]
+        c2 = COLORS[color_idx2]
+        if dragging_bob == 1: c1 = (255, 100, 100) # Light red when dragging
+        if dragging_bob == 2: c2 = (255, 100, 100)
         
-        pygame.draw.circle(screen, color1, (int(curr_x1), int(curr_y1)), 10)
-        pygame.draw.circle(screen, color2, (int(curr_x2), int(curr_y2)), 10)
+        pygame.draw.circle(screen, c1, (int(curr_x1), int(curr_y1)), 10)
+        pygame.draw.circle(screen, c2, (int(curr_x2), int(curr_y2)), 10)
         
         # Draw pivot
         pygame.draw.circle(screen, BLACK, (offset_x, offset_y), 5)
@@ -307,8 +396,12 @@ def animate_pendulum(pendulum):
         screen.blit(img2, (20, 50))
 
         # Draw UI
-        for ui in ui_elements:
-            ui.draw(screen)
+        if ui_visible:
+            for ui in main_ui_elements:
+                ui.draw(screen)
+        
+        # Always draw hide button
+        btn_hide_ui.draw(screen)
 
         pygame.display.flip()
         clock.tick(60) # Target 60 FPS
