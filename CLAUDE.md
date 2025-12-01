@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is a real-time physics simulation of a double pendulum implemented in Python using Pygame for visualization. The simulation uses Lagrangian mechanics with RK4 (Runge-Kutta 4th order) integration for accurate physics.
+This is a real-time physics simulation of a double pendulum implemented in Python using Arcade for visualization. The simulation uses Lagrangian mechanics with RK4 (Runge-Kutta 4th order) integration for accurate physics.
 
 ## Running the Simulation
 
@@ -16,7 +16,12 @@ python main.py
 
 Install required packages:
 ```bash
-pip install numpy scipy pygame
+pip install numpy scipy arcade
+```
+
+Or use the requirements file:
+```bash
+pip install -r requirements.txt
 ```
 
 ## Architecture
@@ -36,11 +41,12 @@ pip install numpy scipy pygame
    - `get_coordinates()`: Converts polar (theta) to Cartesian (x, y) coordinates
 
 3. **visualizer.py** - Rendering and interaction
-   - Pygame-based visualization running at 60 FPS
+   - Arcade-based visualization using `PendulumWindow` class (inherits from `arcade.Window`)
    - Interactive dragging with inverse kinematics (IK) for Bob 2
    - UI elements: `Button` and `InputBox` classes for controls
    - Dynamic scaling to keep pendulum in view
    - Trace rendering for both bobs with configurable colors
+   - Event-driven architecture with `on_draw()`, `on_update()`, `on_mouse_press()`, etc.
 
 ### Key Concepts
 
@@ -50,8 +56,8 @@ pip install numpy scipy pygame
 
 **Coordinate Systems**:
 - Physics coordinates: Origin at pivot point, y-axis points up
-- Screen coordinates: Origin at top-left, y-axis points down
-- Conversion uses `scale` and `offset_x/offset_y` variables
+- Screen coordinates (Arcade): Origin at bottom-left, y-axis points up (same as physics!)
+- Conversion uses `scale` and `offset_x/offset_y` variables for translation and scaling
 
 **Inverse Kinematics (IK)**: When dragging Bob 2, the system solves for joint angles that place the end effector (Bob 2) at the mouse position. Uses law of cosines and angle normalization to choose the closest elbow configuration.
 
@@ -61,4 +67,4 @@ To change physical behavior, edit parameters in `main.py` or adjust the equation
 
 ## Modifying UI
 
-UI elements are instantiated in `animate_pendulum()` around line 180-202 in `visualizer.py`. Each UI element has a callback that modifies the pendulum state or visualization settings.
+UI elements are instantiated in the `PendulumWindow.setup_ui()` method in `visualizer.py`. Each UI element has a callback that modifies the pendulum state or visualization settings. The main entry point is `animate_pendulum()` which creates a `PendulumWindow` instance and calls `arcade.run()`.
