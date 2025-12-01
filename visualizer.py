@@ -124,7 +124,8 @@ def animate_pendulum(pendulum):
     running = True
     dragging_bob = None # 1 or 2
 
-    dt = 0.02 # Time step for physics
+    dt = 0.005 # Time step for physics (smaller for better energy conservation)
+    steps_per_frame = 4 # Multiple physics steps per visual frame
 
     # UI Callbacks
     def reset_simulation():
@@ -337,8 +338,9 @@ def animate_pendulum(pendulum):
             trace_points2.clear()
 
         else:
-            # Physics step
-            pendulum.step(dt)
+            # Physics step - multiple steps per frame for better accuracy
+            for _ in range(steps_per_frame):
+                pendulum.step(dt)
 
         # Rendering
         screen.fill(WHITE)
